@@ -405,8 +405,12 @@ def ensure_cleaned_events(measurement: models.Measurement, entry, hst_files: lis
     event_capture.event_cleanup(entry, raw_events)
     events = raw_events._cleaned_fields
     meta = dict(start=raw_events.start, stop=raw_events.stop, arm=raw_events.arm, disarm=raw_events.disarm)
-    event_cache.save_cleaned_events(measurement, entry.name, events, meta=meta)
-    print(f"{tic()-T0:.6f}: cached events to disk")
+    try:
+        event_cache.save_cleaned_events(measurement, entry.name, events, meta=meta)
+        print(f"{tic()-T0:.6f}: cached events to disk")
+    except Exception as e:
+        logger.warning(f"Could not cache events!")
+
     return events
 
 def get_description(entry):
