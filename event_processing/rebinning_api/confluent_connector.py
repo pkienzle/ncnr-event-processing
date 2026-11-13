@@ -70,6 +70,8 @@ def stream_history(consumer: Consumer, topic: str, start: int, stop: int, partit
     # grab the BUFFER_BEFORE messages before start time to make sure we get all the neutron events
     # so far, the timestamp on the packet has always been less than the neutron event timestamps, 
     # so we can cleanly stop when the packet timestamp > stop without a buffer
+    BUFFER_AFTER = 2
+
     for tp in valid_assignments:
         tp.offset = max(0, tp.offset - BUFFER_BEFORE)
 
@@ -84,6 +86,11 @@ def stream_history(consumer: Consumer, topic: str, start: int, stop: int, partit
         consumer.seek(tp)
 
     active_partitions = {tp.partition for tp in valid_assignments}
+
+    # Per-partition count of messages seen since the first one tagged past
+    # `stop`; a partition is only actually paused once this reaches
+    # BUFFER_AFTER (see BUFFER_AFTER above).
+    past_stop_counts: dict[int, int] = {}
     
     while active_partitions:
         # BATCH FETCH: Pull up to `batch_size` messages at once in C++ before returning to Python
@@ -120,9 +127,12 @@ def stream_history(consumer: Consumer, topic: str, start: int, stop: int, partit
                 continue
             
             if msg_timestamp > stop:
-                active_partitions.remove(pid)
-                consumer.pause([TopicPartition(topic, pid)])
-                continue
+                seen_past_stop = past_stop_counts.get(pid, 0)
+                if seen_past_stop >= BUFFER_AFTER:
+                    active_partitions.remove(pid)
+                    consumer.pause([TopicPartition(topic, pid)])
+                    continue
+                past_stop_counts[pid] = seen_past_stop + 1
 
             valid_batch.append(msg)
 
