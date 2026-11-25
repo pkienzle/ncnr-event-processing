@@ -55,6 +55,8 @@ def nexus_dup(
 
     The split format is twice as big and takes several times longer to write.
     """
+    # TODO: do we want to divvy presets according to time?
+    # TODO: test with a scanned entry
     # Search each detector group for the DASlogs link containing the counts.
     # Record replacement = {link: data}, but only if there are binned events for the detector.
     detector_links = nexus_detector_replacement(entry)
@@ -64,14 +66,13 @@ def nexus_dup(
         if name in detectors  # ... only if the detector event data is available
     }
 
-    # count_time – either full vector if no bin number or scalar for a single bin
+    # Control fields: count_time, monitor_counts, detector_counts
     field = entry["control/count_time"]
     replacement[field.attrs["target"]] = binned['count_time']
-
-    # optional monitor_counts – same logic as count_time
-    if 'monitors' in binned:
-        field = entry["control/monitor_counts"]
-        replacement[field.attrs["target"]] = binned['monitors']
+    field = entry["control/monitor_counts"]
+    replacement[field.attrs["target"]] = binned['monitor']
+    #field = entry["control/detector_counts"]
+    #replacement[field.attrs["target"]] = binned['roi_counts']
 
     # TODO: need to average temperature per frame, etc., from binned['devices']
 
